@@ -83,7 +83,6 @@ class ReflexAgent(Agent):
 
         """Calculating the distances from pacman to the ghosts. Also, checking for the proximity of the ghosts (at distance of 1) around pacman."""
         ghost_distances = [util.manhattanDistance(newPos, ghost.getPosition()) for ghost in newGhostStates]
-        proximity_penalty = sum(1 for dist in ghost_distances if dist <= 1)
 
         """Combination of the above calculated metrics."""
         scared_bonus = 0.0
@@ -95,7 +94,6 @@ class ReflexAgent(Agent):
         return (
             successorGameState.getScore()
             + (1.0 / (min_food_distance + 1))  # Add 1 to avoid zero division
-            - proximity_penalty
             + scared_bonus
             - sum(1.0 / (dist + 1) for dist in ghost_distances)  # Penalize closeness to active ghosts
         )
