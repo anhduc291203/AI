@@ -65,6 +65,23 @@ class ValueIterationAgent(ValueEstimationAgent):
           value iteration, V_k+1(...) depends on V_k(...)'s.
         """
         "*** YOUR CODE HERE ***"
+        while self.iterations > 0:
+            tempValues = self.values.copy()
+            allStates = self.mdp.getStates()
+            for state in allStates:
+                allActionsForState = self.mdp.getPossibleActions(state)
+                chanceNodeValues = []
+                for action in allActionsForState:
+                    finalStates = self.mdp.getTransitionStatesAndProbs(state, action)
+                    weightedAverage = 0
+                    for finalState in finalStates:
+                        nextState = finalState[0]
+                        probability = finalState[1]
+                        weightedAverage += (probability * (self.mdp.getReward(state, action, nextState) + (self.discount * tempValues[nextState])))
+                    chanceNodeValues.append(weightedAverage)
+                if len(chanceNodeValues) != 0:
+                    self.values[state] = max(chanceNodeValues)
+            self.iterations -= 1
 
     def getValue(self, state):
         """
@@ -78,7 +95,15 @@ class ValueIterationAgent(ValueEstimationAgent):
           value function stored in self.values.
         """
         "*** YOUR CODE HERE ***"
-        util.raiseNotDefined()
+        # util.raiseNotDefined()
+        finalStates = self.mdp.getTransitionStatesAndProbs(state, action)
+        weightedAverage = 0
+        for finalState in finalStates:
+            nextState = finalState[0]
+            probability = finalState[1]
+            weightedAverage += (probability * (self.mdp.getReward(state, action, nextState) + (self.discount * self.values[nextState])))
+
+        return weightedAverage
 
     def computeActionFromValues(self, state):
         """
@@ -90,7 +115,19 @@ class ValueIterationAgent(ValueEstimationAgent):
           terminal state, you should return None.
         """
         "*** YOUR CODE HERE ***"
-        util.raiseNotDefined()
+        # util.raiseNotDefined()
+        if self.mdp.isTerminal(state):
+            return None
+        allActionsForState = self.mdp.getPossibleActions(state)
+        finalAction = ""
+        maxSum = float("-inf")
+        for action in allActionsForState:
+            weightedAverage = self.computeQValueFromValues(state, action)
+            if (maxSum == 0.0 and action == "") or weightedAverage >= maxSum:
+                finalAction = action
+                maxSum = weightedAverage
+
+        return finalAction
 
     def getPolicy(self, state):
         return self.computeActionFromValues(state)
