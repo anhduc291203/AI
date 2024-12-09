@@ -95,7 +95,7 @@ class ReflexAgent(Agent):
             successorGameState.getScore()
             + (1.0 / (min_food_distance + 1))  # Add 1 to avoid zero division
             + scared_bonus
-            - sum(1.0 / (dist + 1) for dist in ghost_distances)  # Penalize closeness to active ghosts
+            - 1.0 / (sum(ghost_distances) + 1)  # Penalize closeness to active ghosts
         )
 
 def scoreEvaluationFunction(currentGameState):
@@ -250,26 +250,35 @@ class ExpectimaxAgent(MultiAgentSearchAgent):
           All ghosts should be modeled as choosing uniformly at random from their
           legal moves.
         """
-        "*** YOUR CODE HERE ***"
         def expectimax(agent, depth, gameState):
-            if gameState.isLose() or gameState.isWin() or depth == self.depth:  # return the utility in case the defined depth is reached or the game is won/lost.
+            # Base case: terminal state or max depth reached
+            if gameState.isLose() or gameState.isWin() or depth == self.depth:
                 return self.evaluationFunction(gameState)
-            if agent == 0:  # maximizing for pacman
-                return max(expectimax(1, depth, gameState.generateSuccessor(agent, newState)) for newState in gameState.getLegalActions(agent))
-            else:  # performing expectimax action for ghosts/chance nodes.
-                nextAgent = agent + 1  # calculate the next agent and increase depth accordingly.
-                if gameState.getNumAgents() == nextAgent:
+            
+            legalActions = gameState.getLegalActions(agent)
+            if len(legalActions) == 0:
+                return self.evaluationFunction(gameState)
+            
+            # Maximizing for Pacman (agent 0)
+            if agent == 0:
+                return max(expectimax(1, depth, gameState.generateSuccessor(agent, action)) for action in legalActions)
+            
+            # Minimizing for ghosts (agent > 0)
+            else:
+                nextAgent = agent + 1  # Move to next agent
+                if nextAgent == gameState.getNumAgents():  # If we're at the last agent (last ghost), cycle back to Pacman (0)
                     nextAgent = 0
-                if nextAgent == 0:
+                if nextAgent == 0:  # If we're back at Pacman, increase depth
                     depth += 1
-                return sum(expectimax(nextAgent, depth, gameState.generateSuccessor(agent, newState)) for newState in gameState.getLegalActions(agent)) / float(len(gameState.getLegalActions(agent)))
+                # Calculate the expected value (average over all possible ghost actions)
+                return sum(expectimax(nextAgent, depth, gameState.generateSuccessor(agent, action)) for action in legalActions) / float(len(legalActions))
 
-        """Performing maximizing task for the root node i.e. pacman"""
+        # Perform maximizing task for the root node (Pacman)
         maximum = float("-inf")
-        action = Directions.WEST
-        for agentState in gameState.getLegalActions(0):
-            utility = expectimax(1, 0, gameState.generateSuccessor(0, agentState))
-            if utility > maximum or maximum == float("-inf"):
+        action = Directions.WEST  # Default action if no better option is found
+        for agentState in gameState.getLegalActions(0):  # Iterate over Pacman's legal actions
+            utility = expectimax(1, 0, gameState.generateSuccessor(0, agentState))  # Start with the next agent (ghost)
+            if utility > maximum or maximum == float("-inf"):  # Select the action with the maximum utility
                 maximum = utility
                 action = agentState
 
@@ -287,27 +296,28 @@ def betterEvaluationFunction(currentGameState):
     newPos = currentGameState.getPacmanPosition()
     newFood = currentGameState.getFood()
     newFoodList = newFood.asList()
-    min_food_distance = -1
-    for food in newFoodList:
-        distance = util.manhattanDistance(newPos, food)
-        if min_food_distance >= distance or min_food_distance == -1:
-            min_food_distance = distance
+    newGhostStates = currentGameState.getGhostStates()
+    newScaredTimes = [ghostState.scaredTimer for ghostState in newGhostStates]
+
+    if newFoodList:
+        min_food_distance = min(util.manhattanDistance(newPos, food) for food in newFoodList)
+    else:
+        min_food_distance = 1  # All food eaten
 
     """Calculating the distances from pacman to the ghosts. Also, checking for the proximity of the ghosts (at distance of 1) around pacman."""
-    distances_to_ghosts = 1
-    proximity_to_ghosts = 0
-    for ghost_state in currentGameState.getGhostPositions():
-        distance = util.manhattanDistance(newPos, ghost_state)
-        distances_to_ghosts += distance
-        if distance <= 1:
-            proximity_to_ghosts += 1
+    ghost_distances = [util.manhattanDistance(newPos, ghost.getPosition()) for ghost in newGhostStates]
 
+    scared_bonus = 0.0
+    for i, ghost_distance in enumerate(ghost_distances):
+        if newScaredTimes[i] > 0:  # Ghost is scared
+            scared_bonus += max(0, 1 / ghost_distance)  # Encourage chasing nearby scared ghosts
+    
     """Obtaining the number of capsules available"""
     newCapsule = currentGameState.getCapsules()
     numberOfCapsules = len(newCapsule)
 
     """Combination of the above calculated metrics."""
-    return currentGameState.getScore() + (1 / float(min_food_distance)) - (1 / float(distances_to_ghosts)) - proximity_to_ghosts - numberOfCapsules
+    return currentGameState.getScore() + (1 / float(min_food_distance)) - (1 / (sum(ghost_distances) + 1)) - numberOfCapsules + scared_bonus
 
 # Abbreviation
 better = betterEvaluationFunction
